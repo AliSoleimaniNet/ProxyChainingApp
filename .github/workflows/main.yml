@@ -1,4 +1,4 @@
-name: Ultimate ProxyChainer Build & Deploy
+name: Build & Deploy ProxyChainer
 
 on:
   push:
@@ -14,6 +14,9 @@ env:
   FLET_CLI_NO_RICH_OUTPUT: 1
 
 jobs:
+  # ─────────────────────────────────────────────
+  # BUILD JOBS
+  # ─────────────────────────────────────────────
   build_apps:
     name: Build ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
@@ -21,50 +24,61 @@ jobs:
       fail-fast: false
       matrix:
         include:
+
           - name: windows
             runner: windows-latest
-            build_cmd: "flet build windows --include-packages requests,httpx"
+            build_cmd: flet build windows
             artifact_path: build/windows
-          
+
           - name: apk
             runner: ubuntu-latest
-            build_cmd: "flet build apk --include-packages requests,httpx"
+            build_cmd: flet build apk
             artifact_path: build/apk
 
           - name: web
             runner: ubuntu-latest
-            build_cmd: "flet build web --include-packages requests,httpx --base-url /ProxyChainingApp/"
+            # base-url must match your GitHub Pages repo sub-path
+            build_cmd: flet build web --base-url /ProxyChainingApp/
             artifact_path: build/web
 
     steps:
       - uses: actions/checkout@v4
-      
+
+      # ── Python / uv ──────────────────────────────────────────────
       - name: Setup uv
         uses: astral-sh/setup-uv@v5
 
-      - name: Setup Java (Android Build Requirement)
+      # ── Java (Android only) ──────────────────────────────────────
+      - name: Setup Java
         if: matrix.name == 'apk'
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '17'
+          distribution: temurin
+          java-version: '21'        # Flet 0.82+ requires JDK 21
 
-      - name: Create Virtual Environment and Install Dependencies
+      # ── Install deps ─────────────────────────────────────────────
+      # Dependencies come from pyproject.toml — no --include-packages needed
+      - name: Install dependencies
         run: |
           uv venv
-          uv pip install flet requests
+          uv pip install -e .
 
-      - name: Build App
+      # ── Build ────────────────────────────────────────────────────
+      - name: Build
         run: uv run ${{ matrix.build_cmd }} --yes
 
-      - name: Upload Artifact
+      # ── Upload artifact ──────────────────────────────────────────
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.name }}-artifact
           path: ${{ matrix.artifact_path }}
 
+  # ─────────────────────────────────────────────
+  # DEPLOY WEB → GITHUB PAGES
+  # ─────────────────────────────────────────────
   deploy_web:
-    name: Deploy to GitHub Pages 🚀
+    name: Deploy to GitHub Pages
     needs: build_apps
     if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
@@ -73,8 +87,9 @@ jobs:
       id-token: write
     environment:
       name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
     steps:
-      - name: Download Web Artifact
+      - name: Download web artifact
         uses: actions/download-artifact@v4
         with:
           name: web-artifact
@@ -86,42 +101,50 @@ jobs:
           path: web-dist
 
       - name: Deploy
+        id: deploy
         uses: actions/deploy-pages@v4
 
+  # ─────────────────────────────────────────────
+  # GITHUB RELEASE (tags only)
+  # ─────────────────────────────────────────────
   create_release:
-    name: Create GitHub Release 📦
+    name: Create GitHub Release
     needs: build_apps
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - name: Download All Artifacts
+      - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: all-artifacts
 
-      - name: Prepare Release Files
+      - name: Prepare release files
         shell: bash
         run: |
           mkdir -p release-files
-          
+
+          # Windows → zip
           if [ -d "all-artifacts/windows-artifact" ]; then
             cd all-artifacts/windows-artifact
             zip -r ../../release-files/ProxyChainer-Windows.zip .
             cd ../..
           fi
 
-          find all-artifacts -name "*.apk" -exec cp {} release-files/ProxyChainer-Android.apk \;
-          
-          ls -R release-files/
+          # Android APK → copy
+          find all-artifacts -name "*.apk" \
+            -exec cp {} release-files/ProxyChainer-Android.apk \;
 
-      - name: Upload to Release
+          echo "Release files:"
+          ls -lh release-files/
+
+      - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
+          name: ProxyChainer ${{ github.ref_name }}
+          tag_name: ${{ github.ref }}
+          generate_release_notes: true
           files: |
             release-files/ProxyChainer-Windows.zip
             release-files/ProxyChainer-Android.apk
-          name: Release ${{ github.ref_name }}
-          tag_name: ${{ github.ref }}
-          generate_release_notes: true
