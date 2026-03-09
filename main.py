@@ -24,9 +24,16 @@ def main(page: ft.Page):
     page.padding = 0
     page.scroll = "adaptive"
     page.bgcolor = "#0A0C10"
+
+    # ── Local fonts from assets/fonts/ ────────────────────────────
     page.fonts = {
-        "JetBrains": "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&display=swap",
-        "Syne": "https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&display=swap",
+        "JetBrains":         "fonts/JetBrainsMono-Regular.ttf",
+        "JetBrains-SemiBold":"fonts/JetBrainsMono-SemiBold.ttf",
+        "JetBrains-Bold":    "fonts/JetBrainsMono-Bold.ttf",
+        "Syne":              "fonts/Syne-Regular.ttf",
+        "Syne-SemiBold":     "fonts/Syne-SemiBold.ttf",
+        "Syne-Bold":         "fonts/Syne-Bold.ttf",
+        "Syne-ExtraBold":    "fonts/Syne-ExtraBold.ttf",
     }
 
     # ── Color tokens ──────────────────────────────────────────────
@@ -34,8 +41,8 @@ def main(page: ft.Page):
     SURFACE  = "#111318"
     CARD     = "#161A22"
     BORDER   = "#1E2330"
-    ACCENT   = "#00FFA3"       # neon green
-    ACCENT2  = "#0FF"           # cyan
+    ACCENT   = "#00FFA3"
+    ACCENT2  = "#00FFFF"
     MUTED    = "#4A5368"
     TEXT     = "#E2E8F0"
     TEXT_DIM = "#7A8499"
@@ -48,7 +55,7 @@ def main(page: ft.Page):
     def label(text):
         return ft.Row([
             ft.Container(width=3, height=14, bgcolor=ACCENT, border_radius=2),
-            ft.Text(text, font_family="Syne", size=11, color=ACCENT,
+            ft.Text(text, font_family="Syne-Bold", size=11, color=ACCENT,
                     weight="w600", letter_spacing=2),
         ], spacing=8)
 
@@ -65,8 +72,7 @@ def main(page: ft.Page):
 
     # ── Input fields ───────────────────────────────────────────────
     field_style = dict(
-        font_family="JetBrains",
-        text_size=12,
+        text_style=ft.TextStyle(font_family="JetBrains", size=12, color=TEXT),
         multiline=True,
         min_lines=3,
         max_lines=5,
@@ -74,8 +80,8 @@ def main(page: ft.Page):
         border_color=BORDER,
         focused_border_color=ACCENT,
         cursor_color=ACCENT,
-        color=TEXT,
         label_style=ft.TextStyle(color=MUTED, font_family="JetBrains", size=11),
+        hint_style=ft.TextStyle(color=MUTED, font_family="JetBrains", size=12),
         content_padding=ft.padding.all(14),
         border_radius=8,
     )
@@ -83,13 +89,11 @@ def main(page: ft.Page):
     socks_input = ft.TextField(
         label="SOCKS PROXY  //  socks://user:pass@host:port",
         hint_text="socks://...",
-        hint_style=ft.TextStyle(color=MUTED, font_family="JetBrains"),
         **field_style,
     )
     vless_input = ft.TextField(
         label="VLESS CONFIG  //  vless://uuid@host:port?params",
         hint_text="vless://...",
-        hint_style=ft.TextStyle(color=MUTED, font_family="JetBrains"),
         **field_style,
     )
     final_output = ft.TextField(
@@ -97,24 +101,22 @@ def main(page: ft.Page):
         multiline=True,
         min_lines=12,
         read_only=True,
-        font_family="JetBrains",
-        text_size=11,
+        text_style=ft.TextStyle(font_family="JetBrains", size=11, color=ACCENT2),
         bgcolor=BG,
         border_color=BORDER,
         focused_border_color=ACCENT2,
         cursor_color=ACCENT2,
-        color=ACCENT2,
         label_style=ft.TextStyle(color=MUTED, font_family="JetBrains", size=11),
         content_padding=ft.padding.all(14),
         border_radius=8,
     )
 
-    # ── Status bar state ───────────────────────────────────────────
-    status_text  = ft.Text("READY", font_family="JetBrains", size=11,
-                           color=ACCENT, weight="w600")
-    status_dot   = ft.Container(width=7, height=7, bgcolor=ACCENT,
-                                border_radius=50,
-                                animate=ft.animation.Animation(800, "easeInOut"))
+    # ── Status bar ─────────────────────────────────────────────────
+    status_text = ft.Text("READY", font_family="JetBrains", size=11,
+                          color=ACCENT, weight="w600")
+    status_dot  = ft.Container(width=7, height=7, bgcolor=ACCENT,
+                               border_radius=50,
+                               animate=ft.animation.Animation(800, "easeInOut"))
 
     # ── IP info panel ──────────────────────────────────────────────
     ip_row = ft.Row([
@@ -269,7 +271,7 @@ def main(page: ft.Page):
                 ft.Row([
                     ft.Container(width=4, height=28, bgcolor=ACCENT, border_radius=2),
                     ft.Column([
-                        ft.Text("PROXY CHAINER", font_family="Syne", size=22,
+                        ft.Text("PROXY CHAINER", font_family="Syne-ExtraBold", size=22,
                                 color=TEXT, weight="w800", letter_spacing=3),
                         ft.Text("SOCKS  →  VLESS  //  dialerProxy tunnel builder",
                                 font_family="JetBrains", size=10,
@@ -277,25 +279,23 @@ def main(page: ft.Page):
                     ], spacing=1),
                 ], spacing=12),
             ], expand=True),
-            ft.Column([
-                ft.Container(
-                    content=ft.Row([
-                        status_dot,
-                        status_text,
-                    ], spacing=8, alignment=ft.MainAxisAlignment.END),
-                    padding=ft.padding.symmetric(horizontal=14, vertical=8),
-                    bgcolor=SURFACE,
-                    border_radius=6,
-                    border=ft.border.all(1, BORDER),
-                ),
-            ]),
+            ft.Container(
+                content=ft.Row([
+                    status_dot,
+                    status_text,
+                ], spacing=8),
+                padding=ft.padding.symmetric(horizontal=14, vertical=8),
+                bgcolor=SURFACE,
+                border_radius=6,
+                border=ft.border.all(1, BORDER),
+            ),
         ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
         padding=ft.padding.symmetric(horizontal=28, vertical=20),
         bgcolor=SURFACE,
         border=ft.border.only(bottom=ft.border.BorderSide(1, BORDER)),
     )
 
-    # ── Input section ──────────────────────────────────────────────
+    # ── Input cards ────────────────────────────────────────────────
     def input_card(title, step, field, paste_fn):
         return ft.Container(
             content=ft.Column([
@@ -320,7 +320,7 @@ def main(page: ft.Page):
         content=ft.ElevatedButton(
             content=ft.Row([
                 ft.Icon(ft.icons.BOLT, color=BG, size=18),
-                ft.Text("GENERATE CHAIN CONFIG", font_family="Syne", size=13,
+                ft.Text("GENERATE CHAIN CONFIG", font_family="Syne-Bold", size=13,
                         color=BG, weight="w700", letter_spacing=1.5),
             ], spacing=10, tight=True),
             on_click=process_chain,
@@ -369,17 +369,6 @@ def main(page: ft.Page):
         border=ft.border.only(top=ft.border.BorderSide(1, BORDER)),
     )
 
-    # ── Corner decoration ──────────────────────────────────────────
-    def corner_accent():
-        return ft.Container(
-            width=40, height=40,
-            border=ft.border.only(
-                top=ft.border.BorderSide(1, ACCENT + "44"),
-                left=ft.border.BorderSide(1, ACCENT + "44"),
-            ),
-            border_radius=ft.border_radius.only(top_left=4),
-        )
-
     # ── Assemble page ──────────────────────────────────────────────
     body = ft.Container(
         content=ft.Column([
@@ -405,4 +394,7 @@ def main(page: ft.Page):
     )
 
 
-ft.app(target=main)
+ft.app(
+    target=main,
+    assets_dir="assets",   # <-- tells Flet where to find fonts/images/etc.
+)
