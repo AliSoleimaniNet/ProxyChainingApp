@@ -42,8 +42,18 @@ jobs:
       - name: Setup uv
         uses: astral-sh/setup-uv@v5
 
+      - name: Setup Java (Android Build Requirement)
+        if: matrix.name == 'apk'
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install Dependencies
+        run: uv pip install flet requests --system
+        
       - name: Build App
-        run: uv run ${{ matrix.build_cmd }} --yes
+        run: ${{ matrix.build_cmd }} --yes
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
@@ -91,13 +101,15 @@ jobs:
 
       - name: Prepare Release Files
         run: |
-          mkdir release-files
-          cp all-artifacts/windows-artifact/*.exe release-files/ProxyChainer-Windows.exe || true
-          cp all-artifacts/apk-artifact/*.apk release-files/ProxyChainer-Android.apk || true
+          mkdir -p release-files
+          find all-artifacts -name "*.exe" -exec cp {} release-files/ProxyChainer-Windows.exe \;
+          find all-artifacts -name "*.apk" -exec cp {} release-files/ProxyChainer-Android.apk \;
+          ls -R release-files/
 
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
           files: release-files/*
           name: Release ${{ github.ref_name }}
+          tag_name: ${{ github.ref }}
           generate_release_notes: true
