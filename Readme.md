@@ -45,4 +45,4 @@ Our CI/CD pipeline automatically builds the latest versions for all platforms. Y
 * **CI/CD:** GitHub Actions for multi-platform automated deployment.
 
 ---
-*Built for performance and privacy by AliSoleimaniNet.*
+*Built for performance and privacy by Ali Soleimani.*
