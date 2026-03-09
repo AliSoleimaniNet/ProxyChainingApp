@@ -33,7 +33,7 @@ jobs:
 
           - name: web
             runner: ubuntu-latest
-            build_cmd: "flet build web --base-url /${{ github.event.repository.name }}/"
+            build_cmd: "flet build web --python-pkg requests --python-pkg httpx --base-url /ProxyChainingApp/"
             artifact_path: build/web
 
     steps:
