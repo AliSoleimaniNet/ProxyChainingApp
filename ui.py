@@ -1,18 +1,15 @@
 """
 ui.py  —  ProxyChainer UI
+All business logic lives in config.py / save.py / network.py / parser.py
 """
 
 import flet as ft
-import json
 import threading
-import pathlib
-import datetime
-from urllib.parse import urlparse
 
 from network import get_ip_info
-from parser  import parse_proxy_url, build_outbound
+from config  import build_config_json, get_protocol, get_filename
+from save    import save_config
 
-# ── Colors ────────────────────────────────────────────────────────────────────
 BG       = "#0A0C10"
 SURFACE  = "#111318"
 CARD     = "#161A22"
@@ -73,7 +70,7 @@ def tfield(**kw):
     base = dict(
         text_style=ft.TextStyle(font_family="JetBrains", size=11, color=TEXT),
         multiline=True, min_lines=3, max_lines=5,
-        expand=True,          # fill card width
+        expand=True,
         bgcolor=BG, border_color=BORDER,
         focused_border_color=ACCENT, cursor_color=ACCENT,
         label_style=ft.TextStyle(color=MUTED, font_family="JetBrains", size=10),
@@ -84,7 +81,6 @@ def tfield(**kw):
     base.update(kw)
     return ft.TextField(**base)
 
-# ── Page ──────────────────────────────────────────────────────────────────────
 def build_page(page: ft.Page) -> None:
     page.title      = "ProxyChainer"
     page.theme_mode = ft.ThemeMode.DARK
@@ -98,27 +94,20 @@ def build_page(page: ft.Page) -> None:
         "Syne-ExtraBold": "fonts/Syne-ExtraBold.ttf",
     }
 
-    # ── Stateful widgets (created once, reused across rebuilds) ───
-    socks_input = tfield(
-        label="SOCKS PROXY",
-        hint_text="socks://user:pass@host:port",
-    )
+    socks_input = tfield(label="SOCKS PROXY", hint_text="socks://user:pass@host:port")
     proxy_input = tfield(
         label="PROXY CONFIG (vless / vmess / trojan / ss)",
         hint_text="vless:// or vmess:// or trojan:// or ss://",
     )
     output_field = ft.TextField(
         multiline=True, min_lines=12, max_lines=30,
-        read_only=True,
-        expand=True,
+        read_only=True, expand=True, filled=True,
         text_style=ft.TextStyle(font_family="JetBrains", size=10, color=ACCENT2),
         bgcolor=BG, border_color=BORDER,
         focused_border_color=ACCENT2, cursor_color=ACCENT2,
-        content_padding=ft.Padding(10, 10, 10, 10),
-        border_radius=8,
+        content_padding=ft.Padding(10, 10, 10, 10), border_radius=8,
         hint_text="Generated config appears here…",
         hint_style=ft.TextStyle(color=MUTED, font_family="JetBrains", size=10),
-        filled=True,
     )
     mobile_switch = ft.Switch(active_color=ACCENT2, value=False)
     status_dot    = ft.Container(width=6, height=6, bgcolor=ACCENT, border_radius=50)
@@ -131,7 +120,6 @@ def build_page(page: ft.Page) -> None:
     ping_dot  = ft.Container(width=6, height=6, bgcolor="#888888", border_radius=50)
     fetch_lbl = ft.Text("", font_family="JetBrains", size=9, color=ACCENT2)
 
-    # ── Helpers ───────────────────────────────────────────────────
     def set_status(msg, color=ACCENT, dot=ACCENT):
         status_text.value  = msg
         status_text.color  = color
@@ -162,61 +150,16 @@ def build_page(page: ft.Page) -> None:
     async def process_chain(e):
         set_status("PROCESSING…", ACCENT2, ACCENT2)
         try:
-            v_url     = proxy_input.value.strip()
-            s_url     = socks_input.value.strip()
-            is_mobile = mobile_switch.value
-            if not v_url or not s_url:
-                raise ValueError("Both fields are required")
-            s_parsed       = urlparse(s_url)
-            s_addr, s_port = s_parsed.hostname, s_parsed.port
-            if not s_addr or not s_port:
-                raise ValueError("Invalid SOCKS URL")
-            info     = parse_proxy_url(v_url)
-            outbound = build_outbound(info, "iran-socks")
-            config = {
-                "log": {"loglevel": "warning"},
-                "outbounds": [
-                    outbound,
-                    {"tag": "iran-socks", "protocol": "socks",
-                     "settings": {"servers": [{"address": s_addr, "port": s_port}]}},
-                    {"tag": "direct", "protocol": "freedom",
-                     "settings": {"domainStrategy": "UseIP"}},
-                    {"tag": "block", "protocol": "blackhole"},
-                ],
-            }
-            if is_mobile:
-                config["dns"] = {"servers": ["1.1.1.1", "8.8.8.8"]}
-                config["routing"] = {
-                    "domainStrategy": "IPIfNonMatch",
-                    "rules": [
-                        {"type": "field", "outboundTag": "direct",
-                         "domain": ["geosite:ir", "domain:.ir"]},
-                        {"type": "field", "outboundTag": "direct",
-                         "ip": ["geoip:ir", "geoip:private"]},
-                        {"type": "field", "outboundTag": "proxy-chain",
-                         "port": "0-65535"},
-                    ],
-                }
-            else:
-                config["inbounds"] = [
-                    {"tag": "socks-in", "port": 10808, "listen": "127.0.0.1",
-                     "protocol": "socks",
-                     "settings": {"auth": "noauth", "udp": True},
-                     "sniffing": {"enabled": True, "destOverride": ["http","tls"]}},
-                    {"tag": "http-in", "port": 10809, "listen": "127.0.0.1",
-                     "protocol": "http", "settings": {},
-                     "sniffing": {"enabled": True, "destOverride": ["http","tls"]}},
-                ]
-                config["routing"] = {
-                    "domainStrategy": "IPIfNonMatch",
-                    "rules": [{"type": "field", "outboundTag": "proxy-chain",
-                               "port": "0-65535"}],
-                }
-            output_field.value = json.dumps(config, indent=2)
-            await ft.Clipboard().set(output_field.value)
-            mode = "MOBILE" if is_mobile else "DESKTOP"
-            set_status(f"✓ {mode} · {info['protocol'].upper()} — COPIED",
-                       ACCENT, ACCENT)
+            json_text = build_config_json(
+                socks_input.value,
+                proxy_input.value,
+                mobile_switch.value,
+            )
+            proto = get_protocol(proxy_input.value)
+            output_field.value = json_text
+            await ft.Clipboard().set(json_text)
+            mode = "MOBILE" if mobile_switch.value else "DESKTOP"
+            set_status(f"✓ {mode} · {proto.upper()} — COPIED", ACCENT, ACCENT)
             page.update()
         except Exception as ex:
             set_status(f"ERROR: {ex}", DANGER, DANGER)
@@ -240,49 +183,74 @@ def build_page(page: ft.Page) -> None:
         set_status("CLEARED", MUTED, MUTED)
         page.update()
 
-    def export_json(e):
+    # saved_path holds the last saved path so we can show it under output card
+    saved_path_text = ft.Text("", font_family="JetBrains", size=9, color=ACCENT,
+                               selectable=True)   # selectable so user can copy it
+
+    async def export_json(e):
         if not output_field.value:
             set_status("GENERATE FIRST", DANGER, DANGER)
             return
-        desktop = pathlib.Path.home() / "Desktop"
-        folder  = desktop if desktop.exists() else pathlib.Path.cwd()
-        ts      = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        path    = folder / f"proxy_chain_{ts}.json"
         try:
-            path.write_text(output_field.value, encoding="utf-8")
-            set_status(f"SAVED ✓  {path.name}", ACCENT, ACCENT)
-        except Exception as ex:
-            set_status(f"SAVE ERROR: {ex}", DANGER, DANGER)
+            name = get_filename(socks_input.value, proxy_input.value)
+        except Exception:
+            name = ""
+        ok, msg = await save_config(output_field.value, page=page, name=name)
+        if ok:
+            set_status("SAVED ✓  (see path below)", ACCENT, ACCENT)
+            saved_path_text.value = f"📁  {msg}"
+            saved_path_text.color = ACCENT
+        else:
+            set_status(msg, DANGER, DANGER)
+            saved_path_text.value = f"✗  {msg}"
+            saved_path_text.color = DANGER
+        page.update()
 
-    # ── The one scrollable column that holds all body content ─────
-    # Structure:
-    #   page
-    #     Column(expand=True, spacing=0)
-    #       header_container          <- fixed, not scrolled
-    #       Column(scroll=AUTO,       <- scrollable body
-    #              expand=True)
-    #         body content…
-    #       footer_container          <- fixed, not scrolled
-    #
-    # This is the only layout that reliably shows sticky header+footer
-    # with a scrollable middle in Flet without ListView expand issues.
-
-    header_container = ft.Container(bgcolor=SURFACE,
-                                    border=ft.Border(bottom=ft.BorderSide(1,BORDER)))
+    header_container = ft.Container(
+        bgcolor=SURFACE,
+        border=ft.Border(bottom=ft.BorderSide(1, BORDER)),
+    )
     body_col = ft.Column(scroll=ft.ScrollMode.AUTO, expand=True, spacing=0)
-    footer_container = ft.Container(bgcolor=SURFACE,
-                                    border=ft.Border(top=ft.BorderSide(1,BORDER)))
+    footer_container = ft.Container(
+        bgcolor=SURFACE,
+        border=ft.Border(top=ft.BorderSide(1, BORDER)),
+    )
 
     def rebuild(e=None):
-        w = page.width or 400
+        w   = page.width or 400
         pad = 10 if w < 400 else 14
 
-        # ── Header ────────────────────────────────────────────────
-        status_pill = ft.Container(
-            content=ft.Row([status_dot, status_text], spacing=4, tight=True),
-            padding=ft.Padding(7, 4, 7, 4),
-            bgcolor=CARD, border_radius=5, border=bdr(),
-        )
+        # On very narrow screens: only show the dot, hide the text label
+        # On medium screens: show dot + short text (no overflow)
+        # On wide screens: full pill with full text
+        if w < 360:
+            # Just the dot — absolute minimum
+            status_pill = ft.Container(
+                content=status_dot,
+                padding=ft.Padding(6, 6, 6, 6),
+                bgcolor=CARD, border_radius=5, border=bdr(),
+            )
+        elif w < 540:
+            # Dot + text but max_width capped so it never pushes title off
+            status_text.max_lines = 1
+            status_text.overflow  = ft.TextOverflow.ELLIPSIS
+            status_text.size      = 9
+            status_pill = ft.Container(
+                content=ft.Row([status_dot, status_text], spacing=4, tight=True),
+                padding=ft.Padding(6, 4, 6, 4),
+                bgcolor=CARD, border_radius=5, border=bdr(),
+                width=min(w * 0.42, 160),   # max 42% of screen width
+            )
+        else:
+            status_text.max_lines = 1
+            status_text.overflow  = ft.TextOverflow.ELLIPSIS
+            status_text.size      = 10
+            status_pill = ft.Container(
+                content=ft.Row([status_dot, status_text], spacing=4, tight=True),
+                padding=ft.Padding(7, 4, 7, 4),
+                bgcolor=CARD, border_radius=5, border=bdr(),
+            )
+
         if w < 480:
             hbody = ft.Column([
                 ft.Row([
@@ -312,18 +280,16 @@ def build_page(page: ft.Page) -> None:
                vertical_alignment=ft.CrossAxisAlignment.CENTER)
 
         header_container.content = ft.Container(
-            content=hbody,
-            padding=ft.Padding(pad, 10, pad, 10),
+            content=hbody, padding=ft.Padding(pad, 10, pad, 10),
         )
 
-        # ── Cards ─────────────────────────────────────────────────
         socks_card = ft.Container(
             content=ft.Column([
                 ft.Row([lbl("01  //  SOCKS"),
                         ibtn(ft.Icons.CONTENT_PASTE, "Paste", paste_socks)],
                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                 ft.Container(height=6),
-                ft.Row([socks_input]),   # Row forces full width
+                ft.Row([socks_input]),
             ], spacing=0),
             padding=ft.Padding(12, 12, 12, 12),
             bgcolor=CARD, border_radius=10, border=bdr(),
@@ -334,37 +300,26 @@ def build_page(page: ft.Page) -> None:
                         ibtn(ft.Icons.CONTENT_PASTE, "Paste", paste_proxy)],
                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                 ft.Container(height=6),
-                ft.Row([proxy_input]),   # Row forces full width
+                ft.Row([proxy_input]),
             ], spacing=0),
             padding=ft.Padding(12, 12, 12, 12),
             bgcolor=CARD, border_radius=10, border=bdr(),
         )
 
         if w < 600:
-            # full width on mobile
             socks_card.expand = False
             proxy_card.expand = False
             cards = ft.Column([socks_card, proxy_card], spacing=10)
         else:
-            # 50/50 on desktop
             socks_card.expand = True
             proxy_card.expand = True
             cards = ft.Row([socks_card, proxy_card], spacing=12,
                            vertical_alignment=ft.CrossAxisAlignment.START)
 
-        # ── Generate row ──────────────────────────────────────────
-        # Layout: two separate controls side by side
-        #   LEFT:  compact toggle card  [MOB ◉ PC]
-        #   RIGHT: full green GENERATE button (expands to fill)
-
-        mob_label = ft.Text(
-            "MOB", font_family="JetBrains", size=9,
-            color=TEXT if mobile_switch.value else MUTED,
-        )
-        pc_label = ft.Text(
-            "PC", font_family="JetBrains", size=9,
-            color=TEXT if not mobile_switch.value else MUTED,
-        )
+        mob_label = ft.Text("MOB", font_family="JetBrains", size=9,
+                            color=TEXT if mobile_switch.value else MUTED)
+        pc_label  = ft.Text("PC",  font_family="JetBrains", size=9,
+                            color=TEXT if not mobile_switch.value else MUTED)
 
         def _on_switch(e):
             mob_label.color = TEXT if mobile_switch.value else MUTED
@@ -375,15 +330,13 @@ def build_page(page: ft.Page) -> None:
         toggle_card = ft.Container(
             content=ft.Column([
                 ft.Text("MODE", font_family="JetBrains", size=8, color=ACCENT),
-                ft.Row([mob_label, mobile_switch, pc_label],
+                ft.Row([pc_label, mobile_switch, mob_label],
                        spacing=2, tight=True,
                        vertical_alignment=ft.CrossAxisAlignment.CENTER),
             ], spacing=2, tight=True,
                horizontal_alignment=ft.CrossAxisAlignment.CENTER),
             padding=ft.Padding(14, 8, 14, 8),
-            bgcolor=CARD,
-            border_radius=10,
-            border=bdr(),
+            bgcolor=CARD, border_radius=10, border=bdr(),
         )
 
         gen_btn = ft.Container(
@@ -395,55 +348,47 @@ def build_page(page: ft.Page) -> None:
                             style=ft.TextStyle(letter_spacing=0.8)),
                 ], spacing=8, tight=True,
                    alignment=ft.MainAxisAlignment.CENTER),
-                on_tap=process_chain,
+                on_tap=lambda e: page.run_task(process_chain, e),
             ),
-            expand=True,
-            height=56,
-            bgcolor=ACCENT,
-            border_radius=10,
+            expand=True, height=56,
+            bgcolor=ACCENT, border_radius=10,
             alignment=ft.Alignment(0, 0),
         )
 
         gen_row = ft.Row([toggle_card, gen_btn], spacing=10,
                          vertical_alignment=ft.CrossAxisAlignment.CENTER)
 
-        # ── Output card ───────────────────────────────────────────
         output_card = ft.Container(
             content=ft.Column([
                 ft.Row([
                     lbl("03  //  JSON OUTPUT"),
                     ft.Row([
-                        ibtn(ft.Icons.COPY_ALL,         "Copy",  copy_output, ACCENT2),
-                        ibtn(ft.Icons.DOWNLOAD_ROUNDED, "Save",  export_json, ACCENT),
-                        ibtn(ft.Icons.DELETE_OUTLINE,   "Clear", clear_all,   MUTED),
+                        ibtn(ft.Icons.COPY_ALL,         "Copy",     copy_output, ACCENT2),
+                        ibtn(ft.Icons.DOWNLOAD_ROUNDED, "Download", export_json, ACCENT),
+                        ibtn(ft.Icons.DELETE_OUTLINE,   "Clear",    clear_all,   MUTED),
                     ], spacing=0),
                 ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                 ft.Container(height=6),
-                ft.Row([output_field]),   # Row forces full width
+                ft.Row([output_field]),
                 ft.Text(
-                    "Auto-copied on generate · re-copy or save with buttons above",
+                    "Auto-copied on generate · re-copy or download with buttons above",
                     font_family="JetBrains", size=9, color=MUTED,
                 ),
+                saved_path_text,
             ], spacing=4),
             padding=ft.Padding(12, 12, 12, 12),
             bgcolor=CARD, border_radius=10, border=bdr(),
         )
 
-        # ── Body column contents ──────────────────────────────────
         body_col.controls = [
             ft.Container(
                 content=ft.Column([
-                    cards,
-                    glow(),
-                    gen_row,
-                    glow(),
-                    output_card,
+                    cards, glow(), gen_row, glow(), output_card,
                 ], spacing=10),
                 padding=ft.Padding(pad, pad, pad, pad),
             )
         ]
 
-        # ── Footer ────────────────────────────────────────────────
         footer_container.content = ft.GestureDetector(
             content=ft.Container(
                 content=ft.Column([
@@ -451,10 +396,10 @@ def build_page(page: ft.Page) -> None:
                         ft.Icon(ft.Icons.LANGUAGE, color=MUTED, size=11),
                         mono("IP", 9), ip_val,
                         ft.Container(width=1, height=8, bgcolor=BORDER,
-                                     margin=ft.Margin(4,0,4,0)),
+                                     margin=ft.Margin(4, 0, 4, 0)),
                         mono("CITY", 9), city_val,
                         ft.Container(width=1, height=8, bgcolor=BORDER,
-                                     margin=ft.Margin(4,0,4,0)),
+                                     margin=ft.Margin(4, 0, 4, 0)),
                         mono("PING", 9), ping_val, ping_dot,
                         fetch_lbl,
                     ], spacing=3, wrap=True,
@@ -472,15 +417,9 @@ def build_page(page: ft.Page) -> None:
         page.update()
 
     page.on_resized = rebuild
-
-    # Assemble outer skeleton first, then fill via rebuild()
     page.add(
-        ft.Column([
-            header_container,
-            body_col,
-            footer_container,
-        ], spacing=0, expand=True)
+        ft.Column([header_container, body_col, footer_container],
+                  spacing=0, expand=True)
     )
-
     rebuild()
     threading.Thread(target=lambda: refresh_ip(None), daemon=True).start()

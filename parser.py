@@ -28,9 +28,11 @@ def parse_proxy_url(url: str) -> dict:
     """
     url = url.strip()
 
-    # Strip fragment  (#emoji channel name, etc.)
+    # Extract fragment as remark before stripping
+    remark = ""
     if "#" in url:
-        url = url[: url.index("#")]
+        remark = url[url.index("#") + 1:]
+        url    = url[: url.index("#")]
 
     if "://" not in url:
         raise ValueError("Not a valid proxy URL (missing '://')")
@@ -39,20 +41,20 @@ def parse_proxy_url(url: str) -> dict:
 
     # ── VMess  (Base64-encoded JSON) ──────────────────────────────
     if protocol == "vmess":
-        return _parse_vmess(url)
+        return _parse_vmess(url, remark)
 
     # ── Shadowsocks ───────────────────────────────────────────────
     if protocol in ("ss", "shadowsocks"):
-        return _parse_ss(url)
+        return _parse_ss(url, remark)
 
     # ── VLESS / Trojan  (standard URI) ────────────────────────────
     if protocol in ("vless", "trojan"):
-        return _parse_uri(url, protocol)
+        return _parse_uri(url, protocol, remark)
 
     raise ValueError(f"Unsupported protocol: '{protocol}'")
 
 
-def _parse_vmess(url: str) -> dict:
+def _parse_vmess(url: str, remark: str = "") -> dict:
     b64 = url[len("vmess://"):]
     b64 += "=" * (-len(b64) % 4)          # fix padding
     try:
@@ -62,6 +64,7 @@ def _parse_vmess(url: str) -> dict:
 
     return {
         "protocol": "vmess",
+        "remark":   remark,
         "addr":     d.get("add", ""),
         "port":     int(d.get("port", 443)),
         "uuid":     d.get("id", ""),
@@ -76,7 +79,7 @@ def _parse_vmess(url: str) -> dict:
     }
 
 
-def _parse_ss(url: str) -> dict:
+def _parse_ss(url: str, remark: str = "") -> dict:
     parsed   = urlparse(url)
     userinfo = parsed.username or ""
 
@@ -99,6 +102,7 @@ def _parse_ss(url: str) -> dict:
 
     return {
         "protocol": "ss",
+        "remark":   remark,
         "addr":     parsed.hostname or "",
         "port":     parsed.port or 443,
         "method":   method,
@@ -107,12 +111,13 @@ def _parse_ss(url: str) -> dict:
     }
 
 
-def _parse_uri(url: str, protocol: str) -> dict:
+def _parse_uri(url: str, protocol: str, remark: str = "") -> dict:
     parsed = urlparse(url)
     query  = parse_qs(parsed.query)
     params = {k: unquote(v[0]) for k, v in query.items()}
     return {
         "protocol": protocol,
+        "remark":   remark,
         "addr":     parsed.hostname or "",
         "port":     parsed.port or 443,
         "uuid":     unquote(parsed.username or ""),
