@@ -9,12 +9,6 @@ Your Device  →  Hop 1  →  Hop 2  →  Internet
 
 Available as a **Windows app**, **Android APK**, and **Web app**.
 
-<img width="1632" height="1020" alt="Single Tab" src="https://github.com/user-attachments/assets/848ee3e2-7048-4cfc-8b3c-528d5ba25fa7" />
-
-<img width="1632" height="1020" alt="Group Tab" src="https://github.com/user-attachments/assets/a1a3ee34-bbe9-47c9-887c-ef9f51780840" />
-
-<img width="1632" height="1020" alt="Log Tab" src="https://github.com/user-attachments/assets/16cf989a-471c-47ff-b38d-4f6e6a7e9115" />
-
 ---
 
 ## 🌐 Try it now
@@ -42,6 +36,12 @@ Paste two proxy URLs — ProxyChainer generates a ready-to-use JSON config that 
 - **Group mode** — lists of hop1 + hop2 URLs → generate all combinations and save as a batch
 - **PC / Mobile toggle** — desktop config uses SOCKS5 `10808` + HTTP `10809` inbounds; mobile config bypasses Iran geosite/geoip
 - **IP & ping info** — shows your current exit IP, city, and latency
+
+<img width="1632" height="1020" alt="Single Tab" src="https://github.com/user-attachments/assets/848ee3e2-7048-4cfc-8b3c-528d5ba25fa7" />
+
+<img width="1632" height="1020" alt="Group Tab" src="https://github.com/user-attachments/assets/a1a3ee34-bbe9-47c9-887c-ef9f51780840" />
+
+<img width="1632" height="1020" alt="Log Tab" src="https://github.com/user-attachments/assets/16cf989a-471c-47ff-b38d-4f6e6a7e9115" />
 
 ---
 
