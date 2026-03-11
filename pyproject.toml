@@ -1,7 +1,7 @@
 [project]
 name = "proxychainer"
-version = "1.2.0"
-description = "SOCKS -> VLESS Proxy Chainer"
+version = "1.2.4"
+description = "Any -> Any Proxy Chainer"
 requires-python = ">=3.11"
 dependencies = [
     "flet>=0.82.0",
@@ -10,10 +10,13 @@ dependencies = [
     "oauthlib",
 ]
 
+[tool.setuptools.packages.find]
+include = ["core*", "ui*", "utils*"]
+
 [tool.flet]
 app_name = "ProxyChainer"
 product_name = "ProxyChainer"
-description = "SOCKS → VLESS dialerProxy tunnel builder"
+description = "any → any proxy tunnel builder"
 org = "com.proxychainer"
 assets_dir = "assets"
 
