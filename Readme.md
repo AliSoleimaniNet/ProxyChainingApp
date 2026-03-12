@@ -40,7 +40,8 @@ Paste proxy URLs into hop fields — ProxyChainer generates a ready-to-use JSON 
 - **IP & ping info** — shows your current exit IP, city, and latency
 
 <p align="center">
-  <video src="https://github.com/user-attachments/assets/3bd728c3-8cae-4726-8e89-367e8ba90122" width="80%" controls autoplay loop muted>
+  <video src="https://github.com/user-attachments/assets/3bd728c3-8cae-4726-8e89-367e8ba90122" width="80%" autoplay loop muted playsinline controls>
+  Your browser does not support the video tag.
   </video>
 </p>
 
