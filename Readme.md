@@ -39,6 +39,11 @@ Paste proxy URLs into hop fields — ProxyChainer generates a ready-to-use JSON 
 - **PC / Mobile toggle** — desktop config uses SOCKS5 `10808` + HTTP `10809` inbounds; mobile config bypasses Iran geosite/geoip
 - **IP & ping info** — shows your current exit IP, city, and latency
 
+<p align="center">
+  <video src="https://github.com/user-attachments/assets/3bd728c3-8cae-4726-8e89-367e8ba90122" width="80%" controls autoplay loop muted>
+  </video>
+</p>
+
 ---
 
 ## Output format
